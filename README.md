@@ -1,20 +1,71 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Money Splitter
 
-# Run and deploy your AI Studio app
+A trip expense splitting app built with React, Firebase, and Google Gemini AI. Track shared expenses, calculate who owes whom, and settle debts easily.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/1Y6RqgmnpqsFQOxs6fm2-I4CKASnBoXqv
+- **Trip Management** - Create and manage multiple trips with participants
+- **Expense Tracking** - Add expenses with multi-currency support (TWD, HKD, JPY, USD, EUR, GBP, CNY, KRW, THB)
+- **AI-Powered Input** - Use Gemini AI to parse expenses from natural language
+- **Live Exchange Rates** - Fetch real-time currency rates via AI
+- **Smart Settlement** - Optimized debt calculation to minimize transactions
+- **Payment Methods** - Store payment details (Line Pay, iPASS, FPS, PayMe, bank accounts)
+- **VIP List** - Save frequently used participants
+- **Real-time Sync** - Firebase backend for multi-device sync
+
+## Tech Stack
+
+- **Frontend**: React 19, TypeScript, Tailwind CSS
+- **Backend**: Firebase (Firestore)
+- **AI**: Google Gemini AI
+- **Build**: Vite
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+   ```bash
+   npm install
+   ```
+
+2. Set up environment variables in `.env.local`:
+   ```
+   GEMINI_API_KEY=your_gemini_api_key
+   ```
+
 3. Run the app:
-   `npm run dev`
+   ```bash
+   npm run dev
+   ```
+
+## Build for Production
+
+```bash
+npm run build
+npm run preview
+```
+
+## Deploy to iOS (Optional)
+
+This app can be packaged for the iOS App Store using Capacitor:
+
+1. Install Capacitor:
+   ```bash
+   npm install @capacitor/core @capacitor/cli @capacitor/ios
+   npx cap init
+   ```
+
+2. Build and sync:
+   ```bash
+   npm run build
+   npx cap add ios
+   npx cap sync
+   ```
+
+3. Open in Xcode:
+   ```bash
+   npx cap open ios
+   ```
+
+**Requirements:** Apple Developer Account ($99/year), Mac with Xcode

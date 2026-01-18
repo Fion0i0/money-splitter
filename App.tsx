@@ -198,6 +198,8 @@ const App: React.FC = () => {
 
   // Settlement currency (default TWD)
   const [settlementCurrency, setSettlementCurrency] = useState('TWD');
+  const [currencyRates, setCurrencyRates] = useState<Record<string, number>>({});
+  const [isSettlementRateLoading, setIsSettlementRateLoading] = useState(false);
 
   // Manual Form State
   const [formData, setFormData] = useState({
@@ -262,6 +264,28 @@ const App: React.FC = () => {
       console.error("Failed to fetch rate", e);
     } finally {
       setIsRateLoading(false);
+    }
+  };
+
+  // Fetch all currency rates for settlement page
+  const fetchSettlementRates = async () => {
+    setIsSettlementRateLoading(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const currencyCodes = CURRENCIES.map(c => c.code).filter(c => c !== 'HKD').join(', ');
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `What are the current exchange rates from these currencies to HKD: ${currencyCodes}? Return ONLY a JSON object with currency codes as keys and rates as numbers, like {"TWD": 0.24, "JPY": 0.052}. No explanation.`,
+      });
+      const rateStr = response.text?.trim();
+      const parsed = JSON.parse(rateStr || '{}');
+      if (typeof parsed === 'object') {
+        setCurrencyRates({ ...parsed, HKD: 1 });
+      }
+    } catch (e) {
+      console.error("Failed to fetch settlement rates", e);
+    } finally {
+      setIsSettlementRateLoading(false);
     }
   };
 
@@ -1206,8 +1230,10 @@ const App: React.FC = () => {
               <h3 className="font-bold text-[#E0E6ED] px-1 text-lg uppercase tracking-widest flex justify-between items-center">
                 <span>速速磅，咪兩頭望</span>
                 <div className="flex items-center gap-2">
+                  {isSettlementRateLoading && <i className="fa-solid fa-spinner fa-spin text-[#3df2bc] text-[12px]"></i>}
                   <select
                     value={settlementCurrency}
+                    onClick={fetchSettlementRates}
                     onChange={(e) => setSettlementCurrency(e.target.value)}
                     className="text-[12px] bg-[#0B0E14] border border-[#2A2D33] text-[#E0E6ED] px-2 py-1 rounded font-bold outline-none focus:ring-2 focus:ring-[#3df2bc]"
                   >
@@ -1270,7 +1296,8 @@ const App: React.FC = () => {
                           <div className="text-[#F78181] font-black text-lg tabular-nums">
                             {(() => {
                               const currency = CURRENCIES.find(c => c.code === settlementCurrency);
-                              const convertedAmount = currency ? debt.amount / currency.rate : debt.amount;
+                              const rate = currencyRates[settlementCurrency] ?? currency?.rate ?? 1;
+                              const convertedAmount = debt.amount / rate;
                               return `${currency?.symbol || '$'}${convertedAmount.toFixed(2)} ${settlementCurrency}`;
                             })()}
                           </div>
@@ -1422,7 +1449,8 @@ const App: React.FC = () => {
                             <span className="text-[#3df2bc] font-black text-lg">
                               {(() => {
                                 const currency = CURRENCIES.find(c => c.code === settlementCurrency);
-                                const convertedAmount = currency ? settled.amount / currency.rate : settled.amount;
+                                const rate = currencyRates[settlementCurrency] ?? currency?.rate ?? 1;
+                                const convertedAmount = settled.amount / rate;
                                 return `${currency?.symbol || '$'}${convertedAmount.toFixed(2)}`;
                               })()}
                             </span>
@@ -1525,7 +1553,7 @@ const App: React.FC = () => {
                             <div className="flex bg-[#1A1D23] rounded-lg border border-[#2A2D33] overflow-hidden p-1 gap-1">
                                <button
                                 onClick={() => setTwIpass(true)}
-                                className={`flex-1 py-0.5 text-[11px] font-black rounded ${twIpass ? 'bg-[#FFD700] text-[#0B0E14]' : 'bg-transparent text-[#707A8A]'}`}
+                                className={`flex-1 py-0.5 text-[11px] font-black rounded ${twIpass ? 'bg-[#3df2bc] text-[#0B0E14]' : 'bg-transparent text-[#707A8A]'}`}
                                >YES</button>
                                <button
                                 onClick={() => setTwIpass(false)}

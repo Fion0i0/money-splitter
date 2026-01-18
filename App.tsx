@@ -813,7 +813,7 @@ const App: React.FC = () => {
             <div className="w-40 h-40 bg-[#1A1D23] backdrop-blur-md rounded-3xl flex items-center justify-center mx-auto mb-4 border border-[#3df2bc]/30 shadow-[0_0_20px_rgba(0,242,255,0.2)] overflow-hidden">
               <img src="/icon.png" alt="Logo" className="w-30 h-30 object-contain" />
             </div>
-            <h1 className="text-3xl font-bold text-[#E0E6ED] tracking-tight">漢奸燃混帳App</h1>
+            <h1 className="text-3xl font-bold text-[#E0E6ED] tracking-tight">漢奸撚混帳App</h1>
             {trips.length > 0 && !isCreatingTrip ? (
               <p className="text-[#707A8A] mt-2 text-lg">想睇邊條數</p>
             ) : (
@@ -1063,7 +1063,7 @@ const App: React.FC = () => {
               <h1 className="text-lg font-bold text-[#E0E6ED] flex items-center gap-2">
                 {activeTrip.name}
               </h1>
-              <p className="text-[#707A8A] text-[12px] font-bold uppercase tracking-widest -mt-0.5">漢奸燃分帳 • {participants.length} 條漢奸</p>
+              <p className="text-[#707A8A] text-[12px] font-bold uppercase tracking-widest -mt-0.5">漢奸撚分帳 • {participants.length} 條漢奸</p>
             </div>
           </div>
           <div className="bg-[#3df2bc]/10 text-[#3df2bc] px-2.5 py-0.5 rounded-full text-[12px] font-bold uppercase">

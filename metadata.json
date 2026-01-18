@@ -1,0 +1,7 @@
+{
+  "name": "Money Splitter",
+  "description": "A sophisticated bill-splitting app designed for travelers, featuring smart expense entry, individual settlement tracking, and net debt calculations.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

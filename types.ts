@@ -48,6 +48,14 @@ export interface Debt {
   amount: number;
 }
 
+export interface Settlement {
+  from: string;
+  to: string;
+  amount: number;
+  paymentMethod?: string;
+  date: number;
+}
+
 export interface GeminiSplitResult {
   description: string;
   amount: number;
@@ -61,5 +69,6 @@ export interface Trip {
   icon?: string;
   participants: Participant[];
   expenses: Expense[];
+  settlements?: Settlement[];
   createdAt: number;
 }

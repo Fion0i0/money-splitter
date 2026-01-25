@@ -160,6 +160,7 @@ const App: React.FC = () => {
   // Derived data for active trip
   const participants = useMemo(() => activeTrip?.participants || [], [activeTrip]);
   const expenses = useMemo(() => activeTrip?.expenses || [], [activeTrip]);
+  const settlements = useMemo(() => activeTrip?.settlements || [], [activeTrip]);
 
   const updateActiveTrip = (updates: Partial<Trip>) => {
     if (!activeTrip) return;
@@ -472,19 +473,19 @@ const App: React.FC = () => {
   const settleBetween = (fromId: string, toId: string, paymentMethod?: string) => {
     const fromName = participants.find(p => p.id === fromId)?.name;
     const toName = participants.find(p => p.id === toId)?.name;
-    if (confirm(`Mark all debts from ${fromName} to ${toName} as paid?`)) {
-      const nextExpenses = expenses.map(exp => {
-        if (exp.payerId === toId) {
-          return {
-            ...exp,
-            participants: exp.participants.map(p =>
-              p.userId === fromId ? { ...p, hasPaidBack: true, selectedPaymentMethod: paymentMethod } : p
-            )
-          };
-        }
-        return exp;
-      });
-      updateActiveTrip({ expenses: nextExpenses });
+    // Find the debt amount for this pair
+    const debt = debts.find(d => d.from === fromId && d.to === toId);
+    if (!debt) return;
+
+    if (confirm(`Mark debt from ${fromName} to ${toName} as paid?`)) {
+      const newSettlement = {
+        from: fromId,
+        to: toId,
+        amount: debt.amount,
+        paymentMethod,
+        date: Date.now()
+      };
+      updateActiveTrip({ settlements: [...settlements, newSettlement] });
     }
   };
 
@@ -492,18 +493,9 @@ const App: React.FC = () => {
     const fromName = participants.find(p => p.id === fromId)?.name;
     const toName = participants.find(p => p.id === toId)?.name;
     if (confirm(`Undo payment from ${fromName} to ${toName}?`)) {
-      const nextExpenses = expenses.map(exp => {
-        if (exp.payerId === toId) {
-          return {
-            ...exp,
-            participants: exp.participants.map(p =>
-              p.userId === fromId ? { ...p, hasPaidBack: false, selectedPaymentMethod: null } : p
-            )
-          };
-        }
-        return exp;
-      });
-      updateActiveTrip({ expenses: nextExpenses });
+      // Remove settlements between these two participants
+      const nextSettlements = settlements.filter(s => !(s.from === fromId && s.to === toId));
+      updateActiveTrip({ settlements: nextSettlements });
     }
   };
 
@@ -519,6 +511,7 @@ const App: React.FC = () => {
     const participantIds = new Set(participants.map(p => p.id));
     participants.forEach(p => balanceMap[p.id] = 0);
 
+    // Calculate balances from expenses
     expenses.forEach(exp => {
       // Only count participants who still exist in the trip
       const validParticipants = exp.participants.filter(part => participantIds.has(part.userId));
@@ -526,11 +519,17 @@ const App: React.FC = () => {
 
       const share = exp.amountInBase / validParticipants.length;
       validParticipants.forEach(part => {
-        if (!part.hasPaidBack && part.userId !== exp.payerId) {
+        if (part.userId !== exp.payerId) {
           if (balanceMap[exp.payerId] !== undefined) balanceMap[exp.payerId] += share;
           if (balanceMap[part.userId] !== undefined) balanceMap[part.userId] -= share;
         }
       });
+    });
+
+    // Apply settlements to balances
+    settlements.forEach(s => {
+      if (balanceMap[s.from] !== undefined) balanceMap[s.from] += s.amount;
+      if (balanceMap[s.to] !== undefined) balanceMap[s.to] -= s.amount;
     });
 
     const results: Debt[] = [];
@@ -563,41 +562,17 @@ const App: React.FC = () => {
       }
     }
     return results;
-  }, [expenses, participants]);
+  }, [expenses, participants, settlements]);
 
-  // Calculate settled debts (debts that have been paid back)
+  // Settled debts are now directly from the settlements array
   const settledDebts = useMemo(() => {
-    const settledMap: Record<string, { amount: number; paymentMethod?: string }> = {};
-    const participantIds = new Set(participants.map(p => p.id));
-
-    expenses.forEach(exp => {
-      // Only count participants who still exist in the trip
-      const validParticipants = exp.participants.filter(part => participantIds.has(part.userId));
-      if (validParticipants.length === 0) return;
-
-      const share = exp.amountInBase / validParticipants.length;
-      validParticipants.forEach(part => {
-        if (part.hasPaidBack && part.userId !== exp.payerId) {
-          const key = `${part.userId}-${exp.payerId}`;
-          if (!settledMap[key]) {
-            settledMap[key] = { amount: 0, paymentMethod: part.selectedPaymentMethod };
-          }
-          settledMap[key].amount += share;
-          // Keep the most recent payment method
-          if (part.selectedPaymentMethod) {
-            settledMap[key].paymentMethod = part.selectedPaymentMethod;
-          }
-        }
-      });
-    });
-
-    return Object.entries(settledMap)
-      .filter(([_, data]) => data.amount > 0.01)
-      .map(([key, data]) => {
-        const [from, to] = key.split('-');
-        return { from, to, amount: data.amount, paymentMethod: data.paymentMethod };
-      });
-  }, [expenses, participants]);
+    return settlements.map(s => ({
+      from: s.from,
+      to: s.to,
+      amount: s.amount,
+      paymentMethod: s.paymentMethod
+    }));
+  }, [settlements]);
 
   const participantBalances = useMemo(() => {
     const map: Record<string, { paid: number, share: number, net: number }> = {};
@@ -620,7 +595,7 @@ const App: React.FC = () => {
       });
     });
 
-    // Net balance considering WHO HAS PAID ALREADY
+    // Net balance considering settlements
     const netMap: Record<string, number> = {};
     participants.forEach(p => netMap[p.id] = 0);
     expenses.forEach(exp => {
@@ -630,11 +605,17 @@ const App: React.FC = () => {
 
       const share = exp.amountInBase / validParticipants.length;
       validParticipants.forEach(part => {
-        if (!part.hasPaidBack && part.userId !== exp.payerId) {
+        if (part.userId !== exp.payerId) {
           if (netMap[exp.payerId] !== undefined) netMap[exp.payerId] += share;
           if (netMap[part.userId] !== undefined) netMap[part.userId] -= share;
         }
       });
+    });
+
+    // Apply settlements to net balances
+    settlements.forEach(s => {
+      if (netMap[s.from] !== undefined) netMap[s.from] += s.amount;
+      if (netMap[s.to] !== undefined) netMap[s.to] -= s.amount;
     });
 
     return participants.map(p => ({
@@ -644,7 +625,7 @@ const App: React.FC = () => {
       net: netMap[p.id],
       isClear: Math.abs(netMap[p.id]) < 0.01
     }));
-  }, [expenses, participants]);
+  }, [expenses, participants, settlements]);
 
   const startEditPayment = (p: Participant) => {
     setEditingPaymentId(p.id);
@@ -1276,12 +1257,12 @@ const App: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Dropdown with Settle Button on the right */}
-                        {creditor?.paymentDetails && (
-                          <div className="p-3 border-t border-[#2A2D33] space-y-3">
-                             <div className="space-y-2">
-                               <div className="text-[13px] font-black text-[#707A8A] uppercase tracking-widest px-1">點結帳:</div>
-                               <div className="px-1 flex items-center gap-2">
+                        {/* Settle Button - always visible */}
+                        <div className="p-3 border-t border-[#2A2D33] space-y-3">
+                           <div className="space-y-2">
+                             <div className="text-[13px] font-black text-[#707A8A] uppercase tracking-widest px-1">點結帳:</div>
+                             <div className="px-1 flex items-center gap-2">
+                               {methods.length > 0 && (
                                  <TableSelect
                                    value={selectedPaymentMethods[`${debt.from}-${debt.to}`] || ""}
                                    onChange={(e) => {
@@ -1295,41 +1276,39 @@ const App: React.FC = () => {
                                    }}
                                  >
                                    <option value="" disabled>-- Select method --</option>
-                                   {methods.length === 0 ? (
-                                       <option disabled>No payment methods set</option>
-                                   ) : (
-                                       methods.map((m, mIdx) => (
-                                           <option key={mIdx} value={m.value}>{m.label}</option>
-                                       ))
-                                   )}
+                                   {methods.map((m, mIdx) => (
+                                       <option key={mIdx} value={m.value}>{m.label}</option>
+                                   ))}
                                  </TableSelect>
+                               )}
 
-                                 {/* Paid button */}
-                                 <Button
-                                    onClick={() => {
-                                      const selectedMethod = selectedPaymentMethods[`${debt.from}-${debt.to}`];
-                                      settleBetween(debt.from, debt.to, selectedMethod);
-                                    }}
-                                    variant="success"
-                                    className="h-8 px-3 rounded-xl text-[12px] flex-shrink-0 shadow-sm font-bold"
-                                    title="Mark as Paid"
-                                  >
-                                    Paid
-                                  </Button>
+                               {/* Paid button */}
+                               <Button
+                                  onClick={() => {
+                                    const selectedMethod = selectedPaymentMethods[`${debt.from}-${debt.to}`];
+                                    settleBetween(debt.from, debt.to, selectedMethod);
+                                  }}
+                                  variant="success"
+                                  className="h-8 px-3 rounded-xl text-[12px] flex-shrink-0 shadow-sm font-bold"
+                                  title="Mark as Paid"
+                                >
+                                  Paid
+                                </Button>
 
-                                 {/* Undo button */}
-                                 <Button
-                                    onClick={() => unsettleBetween(debt.from, debt.to)}
-                                    variant="outline"
-                                    className="h-8 px-2 rounded-xl text-[12px] flex-shrink-0 shadow-sm text-[#707A8A] hover:text-[#FF3131] hover:border-[#FF3131]/30"
-                                    title="Undo Payment"
-                                  >
-                                    <i className="fa-solid fa-rotate-left"></i>
-                                  </Button>
-                               </div>
+                               {/* Undo button */}
+                               <Button
+                                  onClick={() => unsettleBetween(debt.from, debt.to)}
+                                  variant="outline"
+                                  className="h-8 px-2 rounded-xl text-[12px] flex-shrink-0 shadow-sm text-[#707A8A] hover:text-[#FF3131] hover:border-[#FF3131]/30"
+                                  title="Undo Payment"
+                                >
+                                  <i className="fa-solid fa-rotate-left"></i>
+                                </Button>
                              </div>
+                           </div>
 
-                             {/* Detailed payment information section */}
+                           {/* Detailed payment information section - only show if payment details exist */}
+                           {creditor?.paymentDetails && (
                              <div className="space-y-2 pt-1 border-t border-[#2A2D33] mt-2">
                                 <div className="text-[13px] font-black text-[#707A8A] uppercase tracking-widest px-1">
                                     <span>點收帳:</span>
@@ -1380,8 +1359,8 @@ const App: React.FC = () => {
                                     ))}
                                 </div>
                              </div>
-                          </div>
-                        )}
+                           )}
+                        </div>
                       </Card>
                     );
                   })

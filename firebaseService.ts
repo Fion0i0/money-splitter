@@ -21,16 +21,33 @@ const database = getDatabase(app);
 // Reference to trips in the database
 const tripsRef = ref(database, 'trips');
 
+// Helper to convert Firebase object to array (Firebase converts arrays to objects with numeric keys)
+const toArray = <T>(obj: any): T[] => {
+  if (!obj) return [];
+  if (Array.isArray(obj)) return obj;
+  return Object.keys(obj).map(key => obj[key]);
+};
+
 // Subscribe to trips changes (real-time listener)
 export const subscribeToTrips = (callback: (trips: Trip[]) => void) => {
   return onValue(tripsRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
       // Convert object to array
-      const tripsArray: Trip[] = Object.keys(data).map(key => ({
-        ...data[key],
-        id: key
-      }));
+      const tripsArray: Trip[] = Object.keys(data).map(key => {
+        const trip = data[key];
+        return {
+          ...trip,
+          id: key,
+          // Ensure arrays are properly converted from Firebase objects
+          participants: toArray(trip.participants),
+          expenses: toArray(trip.expenses).map((exp: any) => ({
+            ...exp,
+            participants: toArray(exp.participants)
+          })),
+          settlements: toArray(trip.settlements)
+        };
+      });
       // Sort by createdAt descending (newest first)
       tripsArray.sort((a, b) => b.createdAt - a.createdAt);
       callback(tripsArray);

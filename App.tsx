@@ -5,6 +5,24 @@ import { GoogleGenAI } from "@google/genai";
 import { VIPMember, loadVIPList, saveVIPList } from './VIP/vipList';
 import { subscribeToTrips, addTrip as firebaseAddTrip, updateTrip as firebaseUpdateTrip, deleteTrip as firebaseDeleteTrip } from './firebaseService';
 
+// --- Helper Functions ---
+// Safely evaluate simple math expressions (supports +, -, *, /, parentheses)
+const evaluateExpression = (expr: string): number | null => {
+  if (!expr || expr.trim() === '') return null;
+  // Only allow numbers, operators, parentheses, decimal points, and spaces
+  if (!/^[\d\s+\-*/().]+$/.test(expr)) return null;
+  try {
+    // Use Function constructor to safely evaluate (no access to global scope)
+    const result = new Function(`return (${expr})`)();
+    if (typeof result === 'number' && isFinite(result) && result >= 0) {
+      return Math.round(result);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 // --- Constants ---
 const CURRENCIES = [
   { code: 'TWD', symbol: '$', rate: 0.24 },
@@ -343,7 +361,7 @@ const App: React.FC = () => {
 
     if (targetParticipants.length === 0) return alert("Select who is sharing");
 
-    const amount = parseFloat(formData.amount);
+    const amount = evaluateExpression(formData.amount) || 0;
     const rate = parseFloat(formData.exchangeRate) || 1.0;
     const amountInBase = amount * rate;
 
@@ -1085,7 +1103,19 @@ const App: React.FC = () => {
 
                       <div className="col-span-4">
                         <label className="text-[11px] font-bold text-[#707A8A] uppercase block mb-0.5">Amount</label>
-                        <TableInput type="number" step="any" placeholder="0.00" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+                        <TableInput
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00 or 100+50"
+                          value={formData.amount}
+                          onChange={e => setFormData({...formData, amount: e.target.value})}
+                          onBlur={e => {
+                            const result = evaluateExpression(e.target.value);
+                            if (result !== null && e.target.value.includes('+') || e.target.value.includes('-') || e.target.value.includes('*') || e.target.value.includes('/') || e.target.value.includes('(')) {
+                              setFormData({...formData, amount: result.toString()});
+                            }
+                          }}
+                        />
                       </div>
                       <div className="col-span-8">
                         <label className="text-[11px] font-bold text-[#707A8A] uppercase block mb-0.5">Currency</label>
@@ -1144,7 +1174,7 @@ const App: React.FC = () => {
 
                     <div className="mt-6 pt-4 border-t border-[#2A2D33] flex items-center justify-between">
                       <div className="text-[12px] text-[#707A8A] font-bold uppercase">
-                        Total: <span className="text-[#3df2bc]">HK${(parseFloat(formData.amount || '0') * parseFloat(formData.exchangeRate || '1')).toFixed(2)}</span>
+                        Total: <span className="text-[#3df2bc]">HK${((evaluateExpression(formData.amount) || 0) * parseFloat(formData.exchangeRate || '1')).toFixed(2)}</span>
                       </div>
                       <div className="flex gap-2">
                         {editingExpenseId && (

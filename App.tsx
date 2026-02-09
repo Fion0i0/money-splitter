@@ -1267,6 +1267,8 @@ const App: React.FC = () => {
                     creditor?.paymentDetails?.other?.banks?.forEach(b => {
                         if (b.accountNo) methods.push({ label: `BANK: ${b.bankName || 'Other'} - ${b.accountNo}`, value: b.bankName });
                     });
+                    // Cash is always available as a payment option
+                    methods.push({ label: "💵 Cash", value: "Cash" });
 
                     return (
                       <Card key={idx} className="!p-0 overflow-hidden hover:shadow-md transition-shadow border-2 border-[#2A2D33] hover:border-[#FF3131]/30">
@@ -1292,25 +1294,23 @@ const App: React.FC = () => {
                            <div className="space-y-2">
                              <div className="text-[13px] font-black text-[#707A8A] uppercase tracking-widest px-1">點結帳:</div>
                              <div className="px-1 flex items-center gap-2">
-                               {methods.length > 0 && (
-                                 <TableSelect
-                                   value={selectedPaymentMethods[`${debt.from}-${debt.to}`] || ""}
-                                   onChange={(e) => {
-                                     const val = e.target.value;
-                                     if (val) {
-                                       setSelectedPaymentMethods(prev => ({
-                                         ...prev,
-                                         [`${debt.from}-${debt.to}`]: val
-                                       }));
-                                     }
-                                   }}
-                                 >
-                                   <option value="" disabled>-- Select method --</option>
-                                   {methods.map((m, mIdx) => (
+                               <TableSelect
+                                 value={selectedPaymentMethods[`${debt.from}-${debt.to}`] || ""}
+                                 onChange={(e) => {
+                                   const val = e.target.value;
+                                   if (val) {
+                                     setSelectedPaymentMethods(prev => ({
+                                       ...prev,
+                                       [`${debt.from}-${debt.to}`]: val
+                                     }));
+                                   }
+                                 }}
+                               >
+                                 <option value="" disabled>-- Select method --</option>
+                                 {methods.map((m, mIdx) => (
                                        <option key={mIdx} value={m.value}>{m.label}</option>
                                    ))}
-                                 </TableSelect>
-                               )}
+                                </TableSelect>
 
                                {/* Paid button */}
                                <Button

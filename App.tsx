@@ -3,7 +3,7 @@ import { Participant, Expense, Debt, BankAccount, Trip } from './types';
 import { parseExpenseWithAI } from './geminiService';
 import { GoogleGenAI } from "@google/genai";
 import { VIPMember, loadVIPList, saveVIPList } from './VIP/vipList';
-import { subscribeToTrips, addTrip as firebaseAddTrip, updateTrip as firebaseUpdateTrip, deleteTrip as firebaseDeleteTrip } from './firebaseService';
+import { subscribeToTrips, addTrip as firebaseAddTrip, updateTrip as firebaseUpdateTrip, deleteTrip as firebaseDeleteTrip, signInWithPassword, subscribeToAuth } from './firebaseService';
 
 // --- Helper Functions ---
 // Safely evaluate simple math expressions (supports +, -, *, /, parentheses)
@@ -153,12 +153,34 @@ const PaymentChip: React.FC<{ label: string; value: string; icon: string; bgColo
 // --- Main App ---
 
 const App: React.FC = () => {
+  // Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAuth((user) => {
+      setIsAuthenticated(!!user);
+      setAuthChecked(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    const ok = await signInWithPassword(password);
+    if (!ok) setAuthError('Wrong password');
+  };
+
   // Trips state - now synced with Firebase
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Subscribe to Firebase real-time updates
+  // Subscribe to Firebase real-time updates (only when authenticated)
   useEffect(() => {
+    if (!isAuthenticated) return;
     const unsubscribe = subscribeToTrips((firebaseTrips) => {
       setTrips(firebaseTrips);
       setIsLoading(false);
@@ -166,7 +188,7 @@ const App: React.FC = () => {
 
     // Cleanup subscription on unmount
     return () => unsubscribe();
-  }, []);
+  }, [isAuthenticated]);
 
   // Always start at trip selection page (activeTripId = null)
   // User must select a trip to proceed
@@ -765,6 +787,44 @@ const App: React.FC = () => {
     navigator.clipboard.writeText(md);
     alert("Markdown report copied to clipboard! You can now paste it into GitHub or a message.");
   };
+
+  // Show password gate if not authenticated
+  if (!authChecked) {
+    return (
+      <div className="w-full min-h-screen bg-[#0B0E14] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-20 h-20 bg-[#1A1D23] rounded-2xl flex items-center justify-center mx-auto mb-4 border border-[#3df2bc]/30 animate-pulse">
+            <i className="fa-solid fa-circle-notch animate-spin text-[#3df2bc] text-3xl"></i>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="w-full min-h-screen bg-[#0B0E14] flex items-center justify-center px-4">
+        <form onSubmit={handleLogin} className="w-full max-w-xs space-y-4 text-center">
+          <div className="w-20 h-20 bg-[#1A1D23] rounded-2xl flex items-center justify-center mx-auto border border-[#2A2D33]">
+            <i className="fa-solid fa-lock text-[#3df2bc] text-3xl"></i>
+          </div>
+          <h1 className="text-xl font-black text-[#E0E6ED] uppercase tracking-widest">Enter Password</h1>
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Password"
+            className="w-full px-4 py-3 bg-[#1A1D23] border border-[#2A2D33] rounded-xl text-[#E0E6ED] text-center text-lg font-bold outline-none focus:ring-2 focus:ring-[#3df2bc] placeholder-[#707A8A]"
+            autoFocus
+          />
+          {authError && <p className="text-[#FF3131] text-sm font-bold">{authError}</p>}
+          <button type="submit" className="w-full py-3 bg-[#3df2bc] text-[#0B0E14] rounded-xl font-black text-lg uppercase tracking-wider hover:opacity-90 transition-opacity">
+            Enter
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   // Show loading screen while Firebase is connecting
   if (isLoading) {

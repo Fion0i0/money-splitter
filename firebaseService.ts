@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set, push, remove, update } from "firebase/database";
+import { getAuth, signInAnonymously, onAuthStateChanged, signOut, User } from "firebase/auth";
 import { Trip } from "./types";
 
 // Firebase configuration
@@ -17,6 +18,24 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
+const auth = getAuth(app);
+
+const APP_PASSWORD = "7749";
+
+// Auth: sign in with password check
+export const signInWithPassword = async (password: string): Promise<boolean> => {
+  if (password !== APP_PASSWORD) return false;
+  await signInAnonymously(auth);
+  return true;
+};
+
+// Auth: subscribe to auth state changes
+export const subscribeToAuth = (callback: (user: User | null) => void) => {
+  return onAuthStateChanged(auth, callback);
+};
+
+// Auth: sign out
+export const signOutUser = () => signOut(auth);
 
 // Reference to trips in the database
 const tripsRef = ref(database, 'trips');

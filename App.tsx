@@ -1268,7 +1268,7 @@ const App: React.FC = () => {
                         if (b.accountNo) methods.push({ label: `BANK: ${b.bankName || 'Other'} - ${b.accountNo}`, value: b.bankName });
                     });
                     // Cash is always available as a payment option
-                    methods.push({ label: "💵 Cash", value: "Cash" });
+                    methods.push({ label: "現兜兜", value: "Cash" });
 
                     return (
                       <Card key={idx} className="!p-0 overflow-hidden hover:shadow-md transition-shadow border-2 border-[#2A2D33] hover:border-[#FF3131]/30">
